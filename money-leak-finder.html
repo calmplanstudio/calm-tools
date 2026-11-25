@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Money Leak Finder: see what small spends cost you a year (UK, free)</title>
+<meta name="description" content="Free UK calculator. Add your coffees, meal deals, takeaways and subscriptions and see what they cost per month and per year, plus what a no-spend challenge could save you.">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="site"><a class="brand" href="index.html">Calm Tools</a><nav><a href="money-leak-finder.html">Money</a><a href="daily-plan-maker.html">Daily plan</a></nav></header>
+
+<h1>Money Leak Finder</h1>
+<p class="lede">Add the small things you buy without thinking. See what they really cost you in a year, and how much a few no-spend days could save. Nothing you type leaves your device.</p>
+
+<div class="card">
+  <h2>1. Your small spends</h2>
+  <p class="hint">We've added some common UK examples. Change the amounts, delete what doesn't apply, add your own.</p>
+  <div class="row spend hint head" style="margin-bottom:4px"><span>What</span><span>£ each time</span><span>Times</span><span>How often</span><span></span></div>
+  <div id="rows"></div>
+  <button class="ghost" id="add" type="button">+ Add a spend</button>
+  <button class="ghost" id="reset" type="button">Start again</button>
+</div>
+
+<div class="card">
+  <h2>2. What it adds up to</h2>
+  <div class="stats">
+    <div class="stat"><span>Per month</span><b id="m">£0</b></div>
+    <div class="stat"><span>Per year</span><b id="y">£0</b></div>
+    <div class="stat"><span>Over 5 years</span><b id="f">£0</b></div>
+  </div>
+  <h2 style="margin-top:20px">Your biggest leaks</h2>
+  <div id="top"></div>
+</div>
+
+<div class="card">
+  <h2>3. Try a no-spend challenge</h2>
+  <label for="ns">How many no-spend days a week could you manage? <span class="hint">(a day where you only buy essentials)</span></label>
+  <input type="range" id="ns" min="0" max="7" value="2">
+  <p>With <b id="nsd">2</b> no-spend days a week you'd keep about</p>
+  <div class="big" id="save">£0 a year</div>
+  <p id="ideas" class="hint"></p>
+  <p class="hint">This only counts day-to-day spends (daily, workday and weekly ones). Monthly bills and subscriptions don't stop on a no-spend day, so cancel those separately.</p>
+</div>
+
+<div class="cta">
+  <img src="https://payhip.com/cdn-cgi/image/format=auto/https://pe56d.s3.amazonaws.com/o_1k87vt5au1rlo1bgf1nposg8n6o1b.png" alt="The Money Reset Kit printable cover">
+  <div>
+    <h3>Turn this into a plan: The Money Reset Kit</h3>
+    <p>11 printable A4 pages: monthly budget, spending tracker, no-spend challenge, debt payoff tracker, sinking funds, a £1,000 savings challenge and more. Undated, made for UK pounds. £5.</p>
+    <a class="btn" data-shop="moneyReset" href="#">Get the kit</a>
+  </div>
+</div>
+
+<footer>Rough estimates only, not financial advice. For free, impartial help with money or debt in the UK, try <a href="https://www.moneyhelper.org.uk" rel="noopener">MoneyHelper</a> or <a href="https://www.stepchange.org" rel="noopener">StepChange</a>.</footer>
+</div>
+
+<script>
+var FREQ = {day:365, weekday:260, week:52, fortnight:26, month:12, year:1};
+var FREQ_LABEL = {day:"every day", weekday:"workdays", week:"a week", fortnight:"a fortnight", month:"a month", year:"a year"};
+var DEFAULTS = [
+  ["Coffee shop coffee", 3.6, "weekday", 1],
+  ["Meal deal lunch", 3.85, "week", 3],
+  ["Takeaway / delivery", 24, "week", 1],
+  ["Streaming subscriptions", 30, "month", 1],
+  ["Snacks and drinks", 2.5, "day", 1],
+  ["Online impulse buys", 10, "week", 1]
+];
+var KEY = "calmtools.leaks.v2";
+var rowsEl = document.getElementById("rows");
+function gbp(n){return "£"+Math.round(n).toLocaleString("en-GB");}
+function load(){try{var s=JSON.parse(localStorage.getItem(KEY));if(Array.isArray(s)&&s.length)return s;}catch(e){}return DEFAULTS.map(function(d){return {name:d[0],amt:d[1],freq:d[2],times:d[3]};});}
+function save(items){try{localStorage.setItem(KEY,JSON.stringify(items));}catch(e){}}
+function addRow(it){
+  var r=document.createElement("div");r.className="row spend";
+  var opts=Object.keys(FREQ).map(function(k){return '<option value="'+k+'">'+FREQ_LABEL[k]+'</option>';}).join("");
+  r.innerHTML='<input class="n" aria-label="What"><input class="a" type="number" min="0" step="0.01" inputmode="decimal" aria-label="Pounds each time"><input class="t" type="number" min="0" step="1" inputmode="numeric" aria-label="Times"><select class="f" aria-label="How often">'+opts+'</select><button class="x" type="button" aria-label="Remove">×</button>';
+  r.querySelector(".n").value=it.name;r.querySelector(".a").value=it.amt;r.querySelector(".t").value=it.times||1;r.querySelector(".f").value=it.freq;
+  r.querySelector(".x").onclick=function(){r.remove();calc();};
+  rowsEl.appendChild(r);
+}
+function read(){return Array.prototype.map.call(rowsEl.children,function(r){return {name:r.querySelector(".n").value||"Something",amt:parseFloat(r.querySelector(".a").value)||0,freq:r.querySelector(".f").value,times:parseFloat(r.querySelector(".t").value)||0};});}
+function calc(){
+  var items=read();save(items);
+  var yearly=items.map(function(i){return {name:i.name,y:i.amt*i.times*FREQ[i.freq],daily:["day","weekday","week","fortnight"].indexOf(i.freq)>=0};});
+  var y=yearly.reduce(function(s,i){return s+i.y;},0);
+  document.getElementById("m").textContent=gbp(y/12);
+  document.getElementById("y").textContent=gbp(y);
+  document.getElementById("f").textContent=gbp(y*5);
+  var top=yearly.slice().sort(function(a,b){return b.y-a.y;}).slice(0,3);
+  var max=top.length?top[0].y:1;
+  document.getElementById("top").innerHTML=top.filter(function(t){return t.y>0;}).map(function(t){
+    return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between"><span>'+t.name.replace(/[<>&]/g,"")+'</span><b>'+gbp(t.y)+' a year</b></div><div class="bar"><i style="width:'+(t.y/max*100)+'%"></i></div></div>';
+  }).join("")||'<p class="hint">Add a spend above to see your leaks.</p>';
+  var d=+document.getElementById("ns").value;
+  document.getElementById("nsd").textContent=d;
+  var dy=yearly.filter(function(i){return i.daily;}).reduce(function(s,i){return s+i.y;},0);
+  var s=dy*d/7;
+  document.getElementById("save").textContent=gbp(s)+" a year";
+  var ideas=[];
+  if(s>=1000) ideas.push("That's a starter emergency fund of £1,000 inside a year.");
+  else if(s>=300) ideas.push("That's Christmas presents paid for in cash next year.");
+  if(s>0) ideas.push("Or "+gbp(s/12)+" a month towards clearing a debt.");
+  document.getElementById("ideas").textContent=ideas.join(" ");
+}
+load().forEach(addRow);
+rowsEl.addEventListener("input",calc);
+document.getElementById("ns").addEventListener("input",calc);
+document.getElementById("add").onclick=function(){addRow({name:"",amt:0,times:1,freq:"week"});calc();rowsEl.lastChild.querySelector(".n").focus();};
+document.getElementById("reset").onclick=function(){try{localStorage.removeItem(KEY);}catch(e){}rowsEl.innerHTML="";load().forEach(addRow);calc();};
+calc();
+</script>
+</body>
+</html>
